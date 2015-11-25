@@ -13,9 +13,11 @@ def run:
                 add mask to table with relevant interface and cost
 
         case query:
-            match longest prefix:
-                return interface
-
+            sort all matching entries by cost
+            if several entries with same cost exists:
+                return interface of entry with longest matching prefix
+            else:
+                return interface of the entry with lowest cost
 
 def main:
     setup()
