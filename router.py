@@ -1,7 +1,9 @@
-import socket
+import socket, re
 from enum import Enum
 from string import ascii_uppercase
 from ipaddress import ip_address, ip_network
+
+CRLF = '\r\n'
 
 class Router:
 
@@ -35,11 +37,11 @@ class Router:
                 print('Connection from', addr)
 
                 # Read binary data into buffer and convert it to string
-                query = conn.recv(1024).decode()
+                request = conn.recv(1024).decode()
 
                 # Handle request
                 try:
-                    self.handle_request(conn, query)
+                    self.handle_request(conn, request)
                 except RouterError as e:
                     print("Error: {}".format(e))
 
@@ -52,15 +54,25 @@ class Router:
             sock.close()
             exit(0)
 
-    def handle_request(self, connection, query):
-        pass
+    def handle_request(self, connection, request):
+        request_lines = request.split(CRLF)
+        request_type = request_lines[0]
+        request_body = request_lines[1:-1]
 
-    def handle_update(self, query):
-        pass
+        # Check whether request is an update or query
+        if request_type == 'UPDATE':
+            self.handle_update(request_body)
+        elif request_type == 'QUERY':
+            self.handle_query(request_body)
+        else:
+            raise RouterError("Unknown request type")
+
+    def handle_update(self, request):
+        print('update')
         # TODO
 
-    def handle_update(self, query):
-        pass
+    def handle_query(self, request):
+        print('query')
         # TODO
 
 class RouterError(Exception):
