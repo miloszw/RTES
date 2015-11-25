@@ -75,19 +75,8 @@ class Router:
             else:
                 raise Exception("Unknown request type")
 
-        def send(self, msg):
-            self.socketConnection.send(msg.encode())
-
-        def send_ack_result(self, body=None):
-            # Send ack for UPDATE requests and results for QUERY
-            if not body:
-                self.send("ACK{}END{}".format(CRLF, CRLF))
-            else:
-                self.send("RESULT{}{}{}END{}".format(CRLF, body, CRLF, CRLF))
-
         def handle_update(self, request):
             for line in request:
-                # For each entry compare its cost
                 interface, mask, cost = line.split(' ')
                 mask = ip_network(mask)
 
@@ -108,6 +97,16 @@ class Router:
                         ret = (interface, cost, mask.prefixlen)
             print("Response:", ret)
             self.send_ack_result("{} {} {}".format(ip, ret[0].value, ret[1]))
+
+        def send_ack_result(self, body=None):
+            # Send ack for UPDATE requests and results for QUERY
+            if not body:
+                self.send("ACK{}END{}".format(CRLF, CRLF))
+            else:
+                self.send("RESULT{}{}{}END{}".format(CRLF, body, CRLF, CRLF))
+
+        def send(self, msg):
+            self.socketConnection.send(msg.encode())
 
 if __name__ == '__main__':
     try:
