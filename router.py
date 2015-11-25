@@ -34,10 +34,11 @@ class Router:
             while True:
                 # Accept new connection
                 conn, addr = sock.accept()
-                print('Connection from', addr)
+                print('\nConnection from', addr)
 
                 # Read binary data into buffer and convert it to string
                 request = conn.recv(1024).decode()
+                print("Request: {}".format(repr(request)))
 
                 # Handle request
                 try:
@@ -48,7 +49,7 @@ class Router:
                 # Close connection
                 finally:
                     conn.close()
-                print('Closed connection')
+                print('Closed connection\n')
         except KeyboardInterrupt:
             print("Shutting down...")
             sock.close()
@@ -68,8 +69,15 @@ class Router:
             raise RouterError("Unknown request type")
 
     def handle_update(self, request):
-        print('update')
-        # TODO
+        for line in request:
+            # For each entry compare its cost
+            interface, mask, cost = line.split(' ')
+            mask = ip_network(mask)
+
+            # Add new entry if mask doesn't exist in the routing table, or
+            # update an existing entry only if the new cost is lower.
+            if mask not in self.routing_table or self.routing_table[mask][1] > cost:
+                self.routing_table[mask] = (interface, cost)
 
     def handle_query(self, request):
         print('query')
