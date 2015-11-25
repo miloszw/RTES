@@ -8,4 +8,5 @@ if __name__ == '__main__':
         print("Usage python3 main.py <PORT>")
         exit(1)
 
-    router = Router(port)
+    router = Router()
+    router.serve('', port)
