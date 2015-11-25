@@ -108,3 +108,13 @@ class Router:
                         ret = (interface, cost, mask.prefixlen)
             print("Response:", ret)
             self.send_ack_result("{} {} {}".format(ip, ret[0].value, ret[1]))
+
+if __name__ == '__main__':
+    try:
+        port = int(sys.argv[1])
+    except (IndexError, ValueError):
+        print("Usage python3 router.py <PORT>")
+        exit(1)
+
+    router = Router()
+    router.serve('', port)
