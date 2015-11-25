@@ -1,4 +1,4 @@
-import socket, re
+import socket, re, sys
 from enum import Enum
 from string import ascii_uppercase
 from ipaddress import ip_address, ip_network
@@ -13,7 +13,7 @@ class Router:
         # Create a list of available interfaces (8 total, A .. H)
         Interfaces = Enum('Interfaces', zip(ascii_uppercase, ascii_uppercase[:8]))
 
-        # A map of network submasks and interface,cost-tuples
+        # A map of network submasks and (interface,cost)-tuples
         self.routing_table = {
             # Pre-populate with a 'catch all' route
             ip_network('0.0.0.0/0'): (Interfaces.A, 100)
@@ -49,14 +49,10 @@ class Router:
         print("Request: {}".format(repr(request)))
 
         # Handle request
-        try:
-            cc.handle_request(request)
-        except Exception as e:
-            print("[!!] Error: {}".format(e))
+        cc.handle_request(request)
 
         # Close connection
-        finally:
-            cc.socketConnection.close()
+        cc.socketConnection.close()
         print('Closed connection\n')
 
     class ClientConnection:
@@ -82,8 +78,12 @@ class Router:
         def send(self, msg):
             self.socketConnection.send(msg.encode())
 
-        def send_ack(self, body=None):
-            self.send("ACK{}{}END{}".format(CRLF, body+CRLF if body else '', CRLF))
+        def send_ack_result(self, body=None):
+            # Send ack for UPDATE requests and results for QUERY
+            if not body:
+                self.send("ACK{}END{}".format(CRLF, CRLF))
+            else:
+                self.send("RESULT{}{}END{}".format(CRLF, body, CRLF))
 
         def handle_update(self, request):
             for line in request:
@@ -95,8 +95,15 @@ class Router:
                 # update an existing entry only if the new cost is lower.
                 if mask not in self.router.routing_table or self.router.routing_table[mask][1] > cost:
                     self.router.routing_table[mask] = (interface, cost)
-            self.send_ack()
+            self.send_ack_result()
 
         def handle_query(self, request):
-            print('query')
-            # TODO
+            ip = ip_address(request[0].strip())
+            #     (interface, cost, prefixlen)
+            ret = (None, sys.maxsize, 0)
+            for mask,(interface,cost) in self.router.routing_table.items():
+                if ip in mask:
+                    # Check if cost is lower. If cost is the same, check prefix length.
+                    if ret[1] > cost or (ret[1] == cost and ret[2] < mask.prefixlen):
+                        ret = (interface, cost, mask.prefixlen)
+            self.send_ack_result("{} {} {}".format(ip, ret[0].value, ret[1]))
