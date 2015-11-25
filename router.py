@@ -30,58 +30,73 @@ class Router:
         print('Listening on port {}'.format(port))
 
         # Keep serving
+        while True:
+            # Accept new connection -- accept() returns a (conn, addr) tuple
+            try:
+                self.handle_connection(sock.accept())
+            except KeyboardInterrupt:
+                print("Shutting down...")
+                self.sock.close()
+                exit(0)
+
+
+    def handle_connection(self, connectionTuple):
+        cc = self.ClientConnection(self, *connectionTuple)
+        print('\nConnection from', cc.address)
+
+        # Read binary data into buffer and convert it to string
+        request = cc.socketConnection.recv(1024).decode()
+        print("Request: {}".format(repr(request)))
+
+        # Handle request
         try:
-            while True:
-                # Accept new connection
-                conn, addr = sock.accept()
-                print('\nConnection from', addr)
+            cc.handle_request(request)
+        except Exception as e:
+            print("[!!] Error: {}".format(e))
 
-                # Read binary data into buffer and convert it to string
-                request = conn.recv(1024).decode()
-                print("Request: {}".format(repr(request)))
+        # Close connection
+        finally:
+            cc.socketConnection.close()
+        print('Closed connection\n')
 
-                # Handle request
-                try:
-                    self.handle_request(conn, request)
-                except RouterError as e:
-                    print("Error: {}".format(e))
+    class ClientConnection:
 
-                # Close connection
-                finally:
-                    conn.close()
-                print('Closed connection\n')
-        except KeyboardInterrupt:
-            print("Shutting down...")
-            sock.close()
-            exit(0)
+        def __init__(self, router, connection, address):
+            self.router = router
+            self.socketConnection = connection
+            self.address = address
 
-    def handle_request(self, connection, request):
-        request_lines = request.split(CRLF)
-        request_type = request_lines[0]
-        request_body = request_lines[1:-1]
+        def handle_request(self, request):
+            request_lines = request.split(CRLF)
+            request_type = request_lines[0]
+            request_body = request_lines[1:-1]
 
-        # Check whether request is an update or query
-        if request_type == 'UPDATE':
-            self.handle_update(request_body)
-        elif request_type == 'QUERY':
-            self.handle_query(request_body)
-        else:
-            raise RouterError("Unknown request type")
+            # Check whether request is an update or query
+            if request_type == 'UPDATE':
+                self.handle_update(request_body)
+            elif request_type == 'QUERY':
+                self.handle_query(request_body)
+            else:
+                raise Exception("Unknown request type")
 
-    def handle_update(self, request):
-        for line in request:
-            # For each entry compare its cost
-            interface, mask, cost = line.split(' ')
-            mask = ip_network(mask)
+        def send(self, msg):
+            self.socketConnection.send(msg.encode())
 
-            # Add new entry if mask doesn't exist in the routing table, or
-            # update an existing entry only if the new cost is lower.
-            if mask not in self.routing_table or self.routing_table[mask][1] > cost:
-                self.routing_table[mask] = (interface, cost)
+        def send_ack(self, body=None):
+            self.send("ACK{}{}END{}".format(CRLF, body+CRLF if body else '', CRLF))
 
-    def handle_query(self, request):
-        print('query')
-        # TODO
+        def handle_update(self, request):
+            for line in request:
+                # For each entry compare its cost
+                interface, mask, cost = line.split(' ')
+                mask = ip_network(mask)
 
-class RouterError(Exception):
-    pass
+                # Add new entry if mask doesn't exist in the routing table, or
+                # update an existing entry only if the new cost is lower.
+                if mask not in self.router.routing_table or self.router.routing_table[mask][1] > cost:
+                    self.router.routing_table[mask] = (interface, cost)
+            self.send_ack()
+
+        def handle_query(self, request):
+            print('query')
+            # TODO
