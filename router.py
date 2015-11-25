@@ -11,12 +11,12 @@ class Router:
 
     def __init__(self):
         # Create a list of available interfaces (8 total, A .. H)
-        Interfaces = Enum('Interfaces', zip(ascii_uppercase, ascii_uppercase[:8]))
+        self.Interfaces = Enum('Interfaces', zip(ascii_uppercase, ascii_uppercase[:8]))
 
         # A map of network submasks and (interface,cost)-tuples
         self.routing_table = {
             # Pre-populate with a 'catch all' route
-            ip_network('0.0.0.0/0'): (Interfaces.A, 100)
+            ip_network('0.0.0.0/0'): (self.Interfaces.A, 100)
         }
 
     def serve(self, host, port):
@@ -65,7 +65,7 @@ class Router:
         def handle_request(self, request):
             request_lines = request.split(CRLF)
             request_type = request_lines[0]
-            request_body = request_lines[1:-1]
+            request_body = request_lines[1:-2]
 
             # Check whether request is an update or query
             if request_type == 'UPDATE':
@@ -83,7 +83,7 @@ class Router:
             if not body:
                 self.send("ACK{}END{}".format(CRLF, CRLF))
             else:
-                self.send("RESULT{}{}END{}".format(CRLF, body, CRLF))
+                self.send("RESULT{}{}{}END{}".format(CRLF, body, CRLF, CRLF))
 
         def handle_update(self, request):
             for line in request:
@@ -93,8 +93,8 @@ class Router:
 
                 # Add new entry if mask doesn't exist in the routing table, or
                 # update an existing entry only if the new cost is lower.
-                if mask not in self.router.routing_table or self.router.routing_table[mask][1] > cost:
-                    self.router.routing_table[mask] = (interface, cost)
+                if mask not in self.router.routing_table or self.router.routing_table[mask][1] > int(cost):
+                    self.router.routing_table[mask] = (self.router.Interfaces[interface], int(cost))
             self.send_ack_result()
 
         def handle_query(self, request):
@@ -106,4 +106,5 @@ class Router:
                     # Check if cost is lower. If cost is the same, check prefix length.
                     if ret[1] > cost or (ret[1] == cost and ret[2] < mask.prefixlen):
                         ret = (interface, cost, mask.prefixlen)
+            print("Response:", ret)
             self.send_ack_result("{} {} {}".format(ip, ret[0].value, ret[1]))
